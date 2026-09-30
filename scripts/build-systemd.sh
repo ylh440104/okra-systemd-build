@@ -26,8 +26,7 @@ rm -rf "$WorkRoot"
 mkdir -p "$WorkRoot" "$SourceDirectory" "$ArtifactDirectory" "$OutputDirectory"
 
 echo "== fetching systemd $Version"
-curl -fsSL --http1.1 --retry 5 --retry-delay 3 --retry-all-errors \
-meson-options.sh -o "$Archive" "https://github.com/systemd/systemd/archive/refs/tags/v$Version.tar.gz"
+curl -fsSL --http1.1 --retry 5 --retry-delay 3 --retry-all-errors -o "$Archive" "https://github.com/systemd/systemd/archive/refs/tags/v$Version.tar.gz"
 SourceSum="$(sha256sum "$Archive" | awk '{print $1}')"
 echo "source sha256 $SourceSum"
 
@@ -45,10 +44,10 @@ DESTDIR="$InstallRoot" fakeroot ninja -C "$BuildDirectory" install
 
 echo "== linked libraries check"
 for Binary in "$InstallRoot/usr/lib/systemd/systemd" "$InstallRoot/usr/bin/systemctl" "$InstallRoot/usr/lib/systemd/systemd-logind"; do
-meson-options.sh [ -f "$Binary" ] || continue
-meson-options.sh echo "-- $(basename "$Binary")"
-meson-options.sh readelf -d "$Binary" 2>/dev/null | grep NEEDED | grep -oE 'lib[a-z0-9_-]+\.so[0-9.]*' | sort -u | tr '\n' ' ' || true
-meson-options.sh echo
+	[ -f "$Binary" ] || continue
+	echo "-- $(basename "$Binary")"
+	readelf -d "$Binary" 2>/dev/null | grep NEEDED | grep -oE 'lib[a-z0-9_-]+\.so[0-9.]*' | sort -u | tr '\n' ' ' || true
+	echo
 done
 
 echo "== assembling package"
