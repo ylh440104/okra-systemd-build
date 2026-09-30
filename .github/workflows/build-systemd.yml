@@ -1,0 +1,66 @@
+name: build-systemd
+
+on:
+  workflow_dispatch:
+    inputs:
+      architecture:
+        description: target architecture
+        required: true
+        default: aarch64
+        type: choice
+        options:
+          - aarch64
+          - x86_64
+      version:
+        description: systemd version
+        required: true
+        default: "262"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ inputs.architecture == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq meson ninja-build gperf pkg-config fakeroot \
+            libmount-dev libblkid-dev libseccomp-dev libkmod-dev libpcre2-dev \
+            libzstd-dev liblzma-dev libbz2-dev zlib1g-dev libcap-dev libgcrypt20-dev
+      - name: build systemd
+        env:
+          SystemdVersion: ${{ inputs.version }}
+          Architecture: ${{ inputs.architecture }}
+        run: bash scripts/build-systemd.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: systemd-${{ inputs.architecture }}
+          path: |
+            ${{ runner.temp }}/okra-artifacts/
+            out/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: systemd-*
+          path: collected
+          merge-multiple: true
+      - name: publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          Architecture: ${{ inputs.architecture }}
+        run: |
+          mkdir -p out
+          [ -d collected/_temp/okra-artifacts ] && cp -a collected/_temp/okra-artifacts/. out/ || true
+          [ -d collected/out ] && cp -a collected/out/. out/ || true
+          bash scripts/publish.sh out
