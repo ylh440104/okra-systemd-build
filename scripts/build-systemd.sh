@@ -34,7 +34,22 @@ tar -xf "$Archive" -C "$SourceDirectory" --strip-components=1
 
 echo "== meson setup"
 cd "$SourceDirectory"
-meson setup "$BuildDirectory" "${MESON_OPTIONS[@]}"
+AvailableOptions="$(meson setup "$BuildDirectory" --help 2>/dev/null | grep -oE '^  -D[a-zA-Z0-9_-]+' | sed 's/^  //' || true)"
+FilteredOptions=()
+for Option in "${MESON_OPTIONS[@]}"; do
+	case "$Option" in
+		-D*)
+			Key="${Option%%=*}"
+			if printf '%s\n' "$AvailableOptions" | grep -qx -- "$Key"; then
+				FilteredOptions+=("$Option")
+			else
+				echo "skipping unknown option $Option"
+			fi
+			;;
+		*) FilteredOptions+=("$Option") ;;
+	esac
+done
+meson setup "$BuildDirectory" "${FilteredOptions[@]}"
 
 echo "== ninja build"
 ninja -C "$BuildDirectory" -j"$(nproc)"
